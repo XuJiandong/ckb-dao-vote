@@ -103,7 +103,7 @@ Initialize `input_count` and `output_count` to zero. The type script iterates th
 Extract the 20-byte blake160 hash from the current script's args field. Verify that one of the cell dependencies contains an out point hash identical to this value. This cell dependency represents the vote meta cell.
 
 **Step 4: Voter Eligibility Verification**
-Read the `smt_root_hash` from the vote meta cell. If the SMT root hash is present (not `None`), use the `lock_script_hash` and `smt_proof` from the witness to verify that the voter's lock script hash exists in the SMT. This step is skipped when `smt_root_hash` is `None`.
+Read the `smt_root_hash` from the vote meta cell. If the SMT root hash is present (not `None`), use the `lock_script_hash` and `smt_proof` from the corresponding witness to verify that the voter's lock script hash exists in the SMT. This step is skipped when `smt_root_hash` is `None`.
 
 **Step 5: Lock Script Validation**
 Verify that at least one input cell contains a lock script whose hash matches the `lock_script_hash` specified in the witness. This ensures the voter controls the claimed identity.
@@ -119,7 +119,7 @@ TODO
 
 ## Deployment
 
-An implementation of the lock script spec above has been deployed to CKB mainnet and testnet:
+An implementation of the type script spec above has been deployed to CKB mainnet and testnet:
 
 - mainnet
 
