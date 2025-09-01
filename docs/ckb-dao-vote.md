@@ -23,11 +23,12 @@ vector String <byte>;
 option StringOpt (String);
 vector StringVec <String>;
 
-table voteMeta {
+table VoteMeta {
     smt_root_hash: BytesOpt,
     candidates: StringVec,
     start_time: Uint64,
     end_time: Uint64,
+    extra: BytesOpt,
 }
 ```
 
@@ -50,6 +51,13 @@ The `start_time` and `end_time` fields define the vote period boundaries. Both v
 
 Time window validation is performed exclusively by off-chain services. The on-chain type script does not enforce these temporal constraints.
 
+### Extra
+
+The `extra` field is an optional bytes field reserved for off-chain service extensions and metadata. This field allows vote organizers to include additional information.
+
+The on-chain type script does not validate or interpret the contents of this field, ensuring forward compatibility and flexibility for off-chain implementations.
+
+
 ## Type Script Format
 The DAO vote type script has the following structure:
 
@@ -68,7 +76,7 @@ Once the vote meta cell is consumed in any transaction, the entire vote session 
 Each vote transaction must include a properly formatted `WitnessArgs` data structure in Molecule format. The `output_type` field contains the vote proof with the following structure:
 
 ```text
-table voteProof {
+table VoteProof {
     lock_script_hash: Bytes,
     smt_proof: Bytes,
 }
