@@ -1,0 +1,21 @@
+[package]
+name = "ckb-dao-vote"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ckb-std = { version = "0.18", default-features = false, features = ["ckb-types", "allocator", "ckb-types", "dummy-atomic", "type-id"] }
+log = { version = "0.4", optional = true, default-features = false }
+molecule = { version = "0.9.1", default-features = false }
+ckb-hash = { version = "0.200.0", default-features = false, features = ["ckb-contract",] }
+hex = { version = "0.4.3", optional = true, default-features = false, features = ["alloc"]}
+sparse-merkle-tree = { git = "https://github.com/joii2020/sparse-merkle-tree.git", rev = "fb0f408", default-features = false }
+blake2b-ref = "0.3.1"
+
+
+[features]
+enable_log = ["log", "ckb-std/log", "hex"]
+
+
+[build-dependencies]
+molecule-codegen = { version = "0.9.1", features = ["compiler-plugin"]}
