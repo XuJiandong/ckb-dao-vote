@@ -23,12 +23,15 @@ fn compile(schema: &str) {
 
 fn main() {
     println!("cargo:rerun-if-changed=./molecules/vote.mol");
+    println!("cargo:rerun-if-changed=./molecules/ckb.mol");
     compile("./molecules/vote.mol");
+    compile("./molecules/ckb.mol");
 
     let output = Command::new("cargo")
         .arg("fmt")
         .arg("--")
         .arg("src/molecules/vote.rs")
+        .arg("src/molecules/ckb.rs")
         .output()
         .expect("Failed to execute command");
 

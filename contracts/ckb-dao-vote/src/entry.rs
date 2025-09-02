@@ -1,15 +1,13 @@
 use crate::error::Error;
-use crate::molecules::{load_vote_meta, load_vote_proof};
+use crate::molecules::{load_tx, load_vote_meta, load_vote_proof};
 use crate::smt_hasher::Blake2bHasher;
 use alloc::vec;
 use alloc::vec::Vec;
 use ckb_hash::new_blake2b;
 use ckb_std::ckb_constants::Source;
 use ckb_std::ckb_types::packed::{Byte, Byte32};
-use ckb_std::ckb_types::prelude::Entity;
 use ckb_std::high_level::{
-    QueryIter, load_cell_data, load_cell_lock_hash, load_cell_type, load_input_out_point,
-    load_script,
+    QueryIter, load_cell_data, load_cell_lock_hash, load_cell_type, load_script,
 };
 use sparse_merkle_tree::CompiledMerkleProof;
 
@@ -62,9 +60,20 @@ pub(crate) fn entry() -> Result<(), Error> {
         return Err(Error::WrongArgs);
     }
     let args: [u8; 20] = args.try_into().unwrap();
-    // TODO: cell deps can't be fetched from syscall directly
-    let position = QueryIter::new(load_input_out_point, Source::CellDep)
-        .position(|out| args == blake160(out.as_slice()));
+
+    // There is no direct syscall to fetch cell_deps, so we need to fetch it from the transaction indirectly.
+    let tx = load_tx()?;
+    let cell_deps = tx.raw()?.cell_deps()?;
+    let position = cell_deps.into_iter().enumerate().find_map(|(index, dep)| {
+        let out_point = dep.out_point().ok()?;
+        let bytes: Vec<u8> = out_point.cursor.try_into().ok()?;
+        if blake160(&bytes) == args {
+            Some(index)
+        } else {
+            None
+        }
+    });
+
     // step 3
     if position.is_none() {
         return Err(Error::NoMetaCell);
@@ -73,31 +82,25 @@ pub(crate) fn entry() -> Result<(), Error> {
     let vote_meta = load_vote_meta(position)?;
     let root_hash = vote_meta.smt_root_hash()?;
 
-    if root_hash.is_none() {
-        // All users can vote (open vote)
-        // TODO: do we need to check step 6?
-        return Ok(());
-    }
-    let root_hash: Vec<u8> = root_hash.unwrap().try_into()?;
-    let root_hash: [u8; 32] = root_hash.try_into().map_err(|_| Error::WrongHashSize)?;
-
     let iter = QueryIter::new(load_cell_type, Source::GroupOutput);
     for (index, _) in iter.enumerate() {
         let vote_proof = load_vote_proof(index)?;
-        let proof = vote_proof.smt_proof()?;
-        let proof: Vec<u8> = proof.try_into()?;
+        let hash: [u8; 32] = vote_proof.lock_script_hash()?;
+        // Only users included in the SMT can vote (restricted vote)
+        if root_hash.is_some() {
+            let root_hash: [u8; 32] = root_hash.unwrap();
 
-        let hash: Vec<u8> = vote_proof.lock_script_hash()?.try_into()?;
-        let hash: [u8; 32] = hash.try_into().map_err(|_| Error::WrongHashSize)?;
-        let compiled_proof = CompiledMerkleProof(proof);
-        // step 4
-        compiled_proof
-            .verify::<Blake2bHasher>(
-                &root_hash.clone().into(),
-                vec![(hash.clone().into(), SMT_VALUE.clone().into())],
-            )
-            .map_err(|_| Error::VerifySmtFail)?;
-
+            let proof = vote_proof.smt_proof()?;
+            let proof: Vec<u8> = proof.try_into()?;
+            let compiled_proof = CompiledMerkleProof(proof);
+            // step 4
+            compiled_proof
+                .verify::<Blake2bHasher>(
+                    &root_hash.clone().into(),
+                    vec![(hash.clone().into(), SMT_VALUE.clone().into())],
+                )
+                .map_err(|_| Error::VerifySmtFail)?;
+        }
         // step 5
         if !QueryIter::new(load_cell_lock_hash, Source::Input).any(|lock| lock == hash) {
             return Err(Error::NoLockFound);

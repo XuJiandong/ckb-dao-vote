@@ -290,6 +290,40 @@ impl StringVec {
     }
 }
 #[derive(Clone)]
+pub struct Byte32 {
+    pub cursor: Cursor,
+}
+impl From<Cursor> for Byte32 {
+    fn from(cursor: Cursor) -> Self {
+        Self { cursor }
+    }
+}
+impl Byte32 {
+    pub fn len(&self) -> usize {
+        32
+    }
+}
+impl Byte32 {
+    pub fn get(&self, index: usize) -> Result<u8, Error> {
+        let cur = self.cursor.slice_by_offset(1usize * index, 1usize)?;
+        cur.try_into()
+    }
+}
+impl Byte32 {
+    pub fn verify(&self, _compatible: bool) -> Result<(), Error> {
+        self.cursor.verify_fixed_size(32usize)?;
+        Ok(())
+    }
+}
+pub struct Byte32Opt {
+    pub cursor: Cursor,
+}
+impl From<Cursor> for Byte32Opt {
+    fn from(cursor: Cursor) -> Self {
+        Self { cursor }
+    }
+}
+#[derive(Clone)]
 pub struct VoteMeta {
     pub cursor: Cursor,
 }
@@ -299,13 +333,12 @@ impl From<Cursor> for VoteMeta {
     }
 }
 impl VoteMeta {
-    pub fn smt_root_hash(&self) -> Result<Option<Cursor>, Error> {
+    pub fn smt_root_hash(&self) -> Result<Option<[u8; 32usize]>, Error> {
         let cur = self.cursor.table_slice_by_index(0usize)?;
         if cur.option_is_none() {
             Ok(None)
         } else {
-            let cur = cur.convert_to_rawbytes()?;
-            Ok(Some(cur.into()))
+            Ok(Some(cur.try_into()?))
         }
     }
 }
@@ -341,6 +374,11 @@ impl VoteMeta {
 impl VoteMeta {
     pub fn verify(&self, compatible: bool) -> Result<(), Error> {
         self.cursor.verify_table(5usize, compatible)?;
+        let val = self.smt_root_hash()?;
+        if val.is_some() {
+            let val = val.unwrap();
+            Byte32::from(Cursor::try_from(val)?).verify(compatible)?;
+        }
         self.candidates()?.verify(compatible)?;
         Ok(())
     }
@@ -355,9 +393,9 @@ impl From<Cursor> for VoteProof {
     }
 }
 impl VoteProof {
-    pub fn lock_script_hash(&self) -> Result<Cursor, Error> {
+    pub fn lock_script_hash(&self) -> Result<[u8; 32usize], Error> {
         let cur = self.cursor.table_slice_by_index(0usize)?;
-        cur.convert_to_rawbytes()
+        cur.try_into()
     }
 }
 impl VoteProof {
@@ -369,6 +407,7 @@ impl VoteProof {
 impl VoteProof {
     pub fn verify(&self, compatible: bool) -> Result<(), Error> {
         self.cursor.verify_table(2usize, compatible)?;
+        Byte32::from(Cursor::try_from(self.lock_script_hash()?)?).verify(compatible)?;
         Ok(())
     }
 }

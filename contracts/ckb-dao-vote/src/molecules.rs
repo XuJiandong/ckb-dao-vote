@@ -1,10 +1,13 @@
 #[allow(clippy::all, unused_imports, dead_code)]
+mod ckb;
+#[allow(clippy::all, unused_imports, dead_code)]
 mod vote;
 
 use crate::error::Error;
 use alloc::boxed::Box;
 use ckb_std::{ckb_constants::Source, error::SysError, syscalls};
 
+pub use ckb::*;
 pub use molecule::lazy_reader::{Cursor, Error as MoleculeError, Read};
 pub use vote::*;
 
@@ -73,6 +76,34 @@ impl From<DataReader> for Cursor {
     }
 }
 
+struct TxReader {
+    total_size: usize,
+}
+
+impl TxReader {
+    fn new() -> Self {
+        let total_size = read_size(|buf| syscalls::load_transaction(buf, 0)).unwrap();
+        Self { total_size }
+    }
+}
+
+impl Read for TxReader {
+    fn read(&self, buf: &mut [u8], offset: usize) -> Result<usize, MoleculeError> {
+        read_data(
+            |buf, offset| syscalls::load_transaction(buf, offset),
+            buf,
+            offset,
+            self.total_size,
+        )
+    }
+}
+
+impl From<TxReader> for Cursor {
+    fn from(data: TxReader) -> Self {
+        Cursor::new(data.total_size, Box::new(data))
+    }
+}
+
 pub struct WitnessArgsReader {
     total_size: usize,
     index: usize,
@@ -128,7 +159,15 @@ pub fn load_vote_meta(index: usize) -> Result<VoteMeta, Error> {
     let reader = DataReader::new(index, Source::CellDep);
     let cursor: Cursor = reader.into();
     let data = VoteMeta::from(cursor);
-    data.verify(false)?;
+    data.verify(true)?;
 
     Ok(data)
+}
+
+pub fn load_tx() -> Result<Transaction, Error> {
+    let reader = TxReader::new();
+    let cursor: Cursor = reader.into();
+    let tx = Transaction::from(cursor);
+
+    Ok(tx)
 }

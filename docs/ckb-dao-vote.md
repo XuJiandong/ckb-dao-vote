@@ -14,17 +14,8 @@ The `blake160` function is defined to return the leading 20 bytes of the `ckbhas
 The vote meta cell stores metadata for a single vote session. It contains the following cell data in Molecule format:
 
 ```text
-array Uint64 [byte; 8];
-
-vector Bytes <byte>;
-option BytesOpt (Bytes);
-
-vector String <byte>;
-option StringOpt (String);
-vector StringVec <String>;
-
 table VoteMeta {
-    smt_root_hash: BytesOpt,
+    smt_root_hash: Byte32Opt,
     candidates: StringVec,
     start_time: Uint64,
     end_time: Uint64,
@@ -77,7 +68,7 @@ Each vote transaction must include a properly formatted `WitnessArgs` data struc
 
 ```text
 table VoteProof {
-    lock_script_hash: Bytes,
+    lock_script_hash: Byte32,
     smt_proof: Bytes,
 }
 ```
