@@ -114,7 +114,117 @@ Steps 4, 5, and 6 are repeated for every cell in the same group of the type scri
 
 ## Examples
 
-TODO
+### One Vote in Single Transaction
+
+```
+cell_deps:
+    <vec> CKB dao vote type script
+    <vec> vote meta cell
+        smt_root_hash: <SMT root hash>
+        candidates: <array of candidates>
+        start_time: <not validated by on-chain script>
+        end_time: <not validated by on-chain script>
+        extra: <not validate by on-chain script>
+inputs:
+    <vec> cell
+        data: <any>
+        type: <any>
+        lock: <voter's lock script>
+outputs:
+    <vec> vote cell
+        data: <candidate, 1 byte>
+        type: <CKB dao vote type script>
+            code_hash: <code hash of CKB dao vote type script>
+            hash_type: <hash type of CKB dao vote type script>
+            args: <blake160 hash of vote meta cell out point, 20 bytes>
+        lock: <any>
+witnesses:
+    <vec> WitnessArgs
+      lock:
+      input_type:
+      output_type: <VoteProof>
+        lock_script_hash: <hash of voter's lock script>
+        smt_proof: <SMT proof>
+```
+
+### Vote Consumption
+
+Release CKB asserts back to users
+
+```
+cell_deps:
+    <vec> CKB dao vote type script
+inputs:
+    <vec> cell
+        data: <any>
+        type: <CKB dao vote type script>
+            code_hash: <code hash of CKB dao vote type script>
+            hash_type: <hash type of CKB dao vote type script>
+            args: <blake160 hash of vote meta cell out point, 20 bytes>
+        lock: <lock script>
+outputs:
+    <vec> any cell
+
+witnesses:
+    <vec> WitnessArgs
+        lock: <signature to lock script>
+        input_type: <none>
+        output_type: <none>
+```
+
+Note, there is no need to attach vote meta cell in cell_deps.
+
+### Multiple Votes in Single Transaction
+
+```
+cell_deps:
+    <vec> CKB dao vote type script
+    <vec> vote meta cell
+        smt_root_hash: <SMT root hash>
+        candidates: <array of candidates>
+        start_time: <not validated by on-chain script>
+        end_time: <not validated by on-chain script>
+        extra: <not validated by on-chain script>
+inputs:
+    <vec> cell
+        data: <any>
+        type: <any>
+        lock: <voter A's lock script>
+    <vec> cell
+        data: <any>
+        type: <any>
+        lock: <voter B's lock script>
+outputs:
+    <vec> vote cell(voter A)
+        data: <candidate, 1 byte>
+        type: <CKB dao vote type script>
+            code_hash: <code hash of CKB dao vote type script>
+            hash_type: <hash type of CKB dao vote type script>
+            args: <blake160 hash of vote meta cell out point, 20 bytes>
+        lock: <any>
+
+    <vec> vote cell(voter B)
+        data: <candidate, 1 byte>
+        type: <CKB dao vote type script>
+            code_hash: <code hash of CKB dao vote type script>
+            hash_type: <hash type of CKB dao vote type script>
+            args: <blake160 hash of vote meta cell out point, 20 bytes>
+        lock: <any>
+witnesses:
+    <vec> WitnessArgs
+      lock:
+      input_type:
+      output_type: <VoteProof>
+        lock_script_hash: <hash of voter A's lock script>
+        smt_proof: <SMT proof for voter A>
+    <vec> WitnessArgs
+      lock:
+      input_type:
+      output_type: <VoteProof>
+        lock_script_hash: <hash of voter B's lock script>
+        smt_proof: <SMT proof for voter B>
+```
+
 
 ## Deployment
 

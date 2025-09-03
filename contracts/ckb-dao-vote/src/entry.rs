@@ -116,6 +116,7 @@ pub(crate) fn entry() -> Result<(), Error> {
             return Err(Error::WrongVoteCandidate);
         }
     }
-
+    #[cfg(feature = "enable_log")]
+    log::info!("ckb-dao-vote, exit successfully");
     Ok(())
 }
