@@ -1,13 +1,16 @@
-use crate::molecules::{VoteMeta, VoteProof, WitnessArgs};
-use crate::smt_hasher::Blake2bHasher;
-use crate::Loader;
-use ckb_testtool::builtin::ALWAYS_SUCCESS;
-use ckb_testtool::ckb_hash::new_blake2b;
-use ckb_testtool::ckb_types::{bytes::Bytes, core::TransactionBuilder, packed::*, prelude::*};
-use ckb_testtool::context::Context;
+use crate::{
+    molecules::{VoteMeta, VoteProof, WitnessArgs},
+    smt_hasher::Blake2bHasher,
+    Loader,
+};
+use ckb_testtool::{
+    builtin::ALWAYS_SUCCESS,
+    ckb_hash::blake2b_256,
+    ckb_types::{bytes::Bytes, core::TransactionBuilder, packed::*, prelude::*},
+    context::Context,
+};
 use serde_molecule::to_vec;
-use sparse_merkle_tree::default_store::DefaultStore;
-use sparse_merkle_tree::{SparseMerkleTree, H256};
+use sparse_merkle_tree::{default_store::DefaultStore, SparseMerkleTree, H256};
 
 const SMT_VALUE: [u8; 32] = [
     1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -16,11 +19,7 @@ const SMT_VALUE: [u8; 32] = [
 pub type CkbSMT = SparseMerkleTree<Blake2bHasher, H256, DefaultStore<H256>>;
 
 fn blake160(bytes: &[u8]) -> [u8; 20] {
-    let mut blake2b = new_blake2b();
-    blake2b.update(bytes);
-    let mut ret = [0; 32];
-    blake2b.finalize(&mut ret);
-    ret[0..20].try_into().unwrap()
+    blake2b_256(bytes)[0..20].try_into().unwrap()
 }
 
 #[test]
@@ -46,11 +45,11 @@ fn test_open_vote() {
     let args = blake160(vote_meta_out_point.as_slice());
     let type_script = context
         .build_script(&out_point, Bytes::from(args.to_vec()))
-        .expect("script");
+        .unwrap();
 
     let always_success_script = context
         .build_script(&always_success_out_point, Bytes::new())
-        .expect("always success script");
+        .unwrap();
 
     let input_out_point = context.create_cell(
         CellOutput::new_builder()
@@ -107,6 +106,51 @@ fn test_open_vote() {
     println!("consume cycles: {}", cycles);
 }
 
+#[test]
+fn test_consume_vote() {
+    // no need to attach vote meta cell
+    let mut context = Context::default();
+    let script_bin: Bytes = Loader::default().load_binary("ckb-dao-vote");
+    let out_point = context.deploy_cell(script_bin);
+
+    let always_success_out_point = context.deploy_cell(ALWAYS_SUCCESS.clone());
+
+    let type_script = context.build_script(&out_point, Bytes::new()).unwrap();
+
+    let always_success_script = context
+        .build_script(&always_success_out_point, Bytes::new())
+        .unwrap();
+
+    let input_out_point = context.create_cell(
+        CellOutput::new_builder()
+            .capacity(1000u64.pack())
+            .lock(always_success_script.clone())
+            .type_(Some(type_script).pack())
+            .build(),
+        Bytes::new(),
+    );
+    let input = CellInput::new_builder()
+        .previous_output(input_out_point)
+        .build();
+
+    let outputs = vec![CellOutput::new_builder()
+        .capacity(500u64.pack())
+        .lock(always_success_script.clone())
+        .build()];
+
+    let tx = TransactionBuilder::default()
+        .input(input)
+        .outputs(outputs)
+        .outputs_data(vec![Bytes::new()].pack())
+        .build();
+    let tx = context.complete_tx(tx);
+
+    let cycles = context
+        .verify_tx(&tx, 10_000_000)
+        .expect("pass verification");
+    println!("consume cycles: {}", cycles);
+}
+
 pub(crate) enum TestScheme {
     Normal,
     Molecule,
@@ -134,7 +178,7 @@ pub(crate) fn entry(config: &Config) {
         // make args different to represent different voters
         let voter_lock_script = context
             .build_script(&always_success_out_point, Bytes::from(vec![i as u8]))
-            .expect("always success script");
+            .unwrap();
         let script_hash = voter_lock_script.calc_script_hash();
         let key: [u8; 32] = script_hash.as_slice().try_into().unwrap();
         smt_tree
@@ -149,19 +193,29 @@ pub(crate) fn entry(config: &Config) {
         end_time: 0,
         extra: None,
     };
-    let vote_meta_bin = to_vec(&vote_meta, false).expect("serialize vote meta");
+    let vote_meta_bin = to_vec(&vote_meta, false).unwrap();
+
+    let vote_meta_bin = match config.test_scheme {
+        TestScheme::Molecule => vote_meta_bin.iter().map(|_| 0).collect(),
+        _ => vote_meta_bin,
+    };
     let vote_meta_out_point = context.deploy_cell(vote_meta_bin.into());
 
     let script_bin: Bytes = Loader::default().load_binary("ckb-dao-vote");
     let out_point = context.deploy_cell(script_bin);
 
-    let args = blake160(vote_meta_out_point.as_slice());
-    let type_script = context
-        .build_script(&out_point, Bytes::from(args.to_vec()))
-        .expect("script");
+    let args = match config.test_scheme {
+        TestScheme::NoMetaCell => [0u8; 20],
+        _ => blake160(vote_meta_out_point.as_slice()),
+    };
+    let args: Vec<u8> = match config.test_scheme {
+        TestScheme::WrongArgs => vec![0u8; 10],
+        _ => args.to_vec(),
+    };
+    let type_script = context.build_script(&out_point, Bytes::from(args)).unwrap();
     let always_success_script = context
         .build_script(&always_success_out_point, Bytes::new())
-        .expect("always success script");
+        .unwrap();
 
     let mut inputs = vec![];
     let mut outputs = vec![];
@@ -171,12 +225,18 @@ pub(crate) fn entry(config: &Config) {
         // make args different to represent different voters
         let voter_lock_script = context
             .build_script(&always_success_out_point, Bytes::from(vec![i as u8]))
-            .expect("always success script");
+            .unwrap();
+
+        let input_type_script = match config.test_scheme {
+            TestScheme::WrongTxType => Some(type_script.clone()).pack(),
+            _ => None::<Script>.pack(),
+        };
 
         let input_out_point = context.create_cell(
             CellOutput::new_builder()
                 .capacity(1000u64.pack())
                 .lock(voter_lock_script.clone())
+                .type_(input_type_script)
                 .build(),
             Bytes::new(),
         );
@@ -193,7 +253,14 @@ pub(crate) fn entry(config: &Config) {
                 .build(),
         );
         // choice
-        outputs_data.push(Bytes::from(vec![0]).pack());
+        match config.test_scheme {
+            TestScheme::WrongVoteCandidate => {
+                outputs_data.push(Bytes::from(vec![0xFF]).pack());
+            }
+            _ => {
+                outputs_data.push(Bytes::from(vec![0]).pack());
+            }
+        }
 
         // witness
         let key: [u8; 32] = voter_lock_script
@@ -201,14 +268,20 @@ pub(crate) fn entry(config: &Config) {
             .as_slice()
             .try_into()
             .unwrap();
-        let proof = smt_tree.merkle_proof(vec![key.into()]).expect("proof");
-        let compiled_proof = proof
-            .clone()
-            .compile(vec![key.into()])
-            .expect("compile proof");
+        let proof = smt_tree.merkle_proof(vec![key.into()]).unwrap();
+        let compiled_proof = proof.clone().compile(vec![key.into()]).unwrap();
+
+        let key = match config.test_scheme {
+            TestScheme::NoLockFound => [0u8; 32],
+            _ => key,
+        };
+        let smt_proof = match config.test_scheme {
+            TestScheme::VerifySmtFail => vec![0u8; 1],
+            _ => compiled_proof.0,
+        };
         let vote_proof = VoteProof {
             lock_script_hash: key,
-            smt_proof: compiled_proof.0,
+            smt_proof,
         };
 
         let witness_args = WitnessArgs {
@@ -232,10 +305,16 @@ pub(crate) fn entry(config: &Config) {
         .build();
     let tx = context.complete_tx(tx);
 
-    let cycles = context
-        .verify_tx(&tx, 10_000_000)
-        .expect("pass verification");
-    println!("consume cycles: {}", cycles);
+    let result = context.verify_tx(&tx, 10_000_000);
+    match config.test_scheme {
+        TestScheme::Normal => {
+            assert!(result.is_ok());
+            println!("consume cycles: {}", result.unwrap());
+        }
+        _ => {
+            assert!(result.is_err());
+        }
+    }
 }
 
 #[test]
@@ -253,5 +332,68 @@ fn test_multiple_vote() {
         voter_count: 3,
         candidate_count: 5,
         test_scheme: TestScheme::Normal,
+    });
+}
+
+#[test]
+fn test_wrong_choice() {
+    entry(&Config {
+        voter_count: 1,
+        candidate_count: 5,
+        test_scheme: TestScheme::WrongVoteCandidate,
+    });
+}
+
+#[test]
+fn test_wrong_tx_type() {
+    entry(&Config {
+        voter_count: 1,
+        candidate_count: 5,
+        test_scheme: TestScheme::WrongTxType,
+    });
+}
+
+#[test]
+fn test_no_meta_cell() {
+    entry(&Config {
+        voter_count: 1,
+        candidate_count: 5,
+        test_scheme: TestScheme::NoMetaCell,
+    });
+}
+
+#[test]
+fn test_wrong_args() {
+    entry(&Config {
+        voter_count: 1,
+        candidate_count: 5,
+        test_scheme: TestScheme::WrongArgs,
+    });
+}
+
+#[test]
+fn test_no_lock_found() {
+    entry(&Config {
+        voter_count: 1,
+        candidate_count: 5,
+        test_scheme: TestScheme::NoLockFound,
+    });
+}
+
+#[test]
+fn test_verify_smt_fail() {
+    entry(&Config {
+        voter_count: 1,
+        candidate_count: 5,
+        test_scheme: TestScheme::VerifySmtFail,
+    });
+}
+
+#[test]
+fn test_molecule_failed() {
+    entry(&Config {
+        voter_count: 1,
+        candidate_count: 5,
+        test_scheme: TestScheme::Molecule,
     });
 }
