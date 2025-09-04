@@ -140,8 +140,8 @@ outputs:
         lock: <any>
 witnesses:
     <vec> WitnessArgs
-      lock:
-      input_type:
+      lock: <any>
+      input_type: <any>
       output_type: <VoteProof>
         lock_script_hash: <hash of voter's lock script>
         smt_proof: <SMT proof>
@@ -168,8 +168,8 @@ outputs:
 witnesses:
     <vec> WitnessArgs
         lock: <signature to lock script>
-        input_type: <none>
-        output_type: <none>
+        input_type: <any>
+        output_type: <any>
 ```
 
 Note, there is no need to attach vote meta cell in cell_deps.
@@ -212,14 +212,14 @@ outputs:
         lock: <any>
 witnesses:
     <vec> WitnessArgs
-      lock:
-      input_type:
+      lock: <any>
+      input_type: <any>
       output_type: <VoteProof>
         lock_script_hash: <hash of voter A's lock script>
         smt_proof: <SMT proof for voter A>
     <vec> WitnessArgs
-      lock:
-      input_type:
+      lock: <any>
+      input_type: <any>
       output_type: <VoteProof>
         lock_script_hash: <hash of voter B's lock script>
         smt_proof: <SMT proof for voter B>
