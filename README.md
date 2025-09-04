@@ -1,6 +1,13 @@
 # ckb-dao-vote
 
-TODO: Write this readme
+See [specification](./docs/ckb-dao-vote.md).
+
+## How to Build and Test
+
+```
+make build
+make test
+```
 
 *This project was bootstrapped with [ckb-script-templates].*
 
