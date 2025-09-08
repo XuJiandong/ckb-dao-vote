@@ -14,17 +14,8 @@ The `blake160` function is defined to return the leading 20 bytes of the `ckbhas
 The vote meta cell stores metadata for a single vote session. It contains the following cell data in Molecule format:
 
 ```text
-array Uint64 [byte; 8];
-
-vector Bytes <byte>;
-option BytesOpt (Bytes);
-
-vector String <byte>;
-option StringOpt (String);
-vector StringVec <String>;
-
 table VoteMeta {
-    smt_root_hash: BytesOpt,
+    smt_root_hash: Byte32Opt,
     candidates: StringVec,
     start_time: Uint64,
     end_time: Uint64,
@@ -77,7 +68,7 @@ Each vote transaction must include a properly formatted `WitnessArgs` data struc
 
 ```text
 table VoteProof {
-    lock_script_hash: Bytes,
+    lock_script_hash: Byte32,
     smt_proof: Bytes,
 }
 ```
@@ -123,7 +114,117 @@ Steps 4, 5, and 6 are repeated for every cell in the same group of the type scri
 
 ## Examples
 
-TODO
+### One Vote in Single Transaction
+
+```
+cell_deps:
+    <vec> CKB dao vote type script
+    <vec> vote meta cell
+        smt_root_hash: <SMT root hash>
+        candidates: <array of candidates>
+        start_time: <not validated by on-chain script>
+        end_time: <not validated by on-chain script>
+        extra: <not validate by on-chain script>
+inputs:
+    <vec> cell
+        data: <any>
+        type: <any>
+        lock: <voter's lock script>
+outputs:
+    <vec> vote cell
+        data: <candidate, 1 byte>
+        type: <CKB dao vote type script>
+            code_hash: <code hash of CKB dao vote type script>
+            hash_type: <hash type of CKB dao vote type script>
+            args: <blake160 hash of vote meta cell out point, 20 bytes>
+        lock: <any>
+witnesses:
+    <vec> WitnessArgs
+      lock: <any>
+      input_type: <any>
+      output_type: <VoteProof>
+        lock_script_hash: <hash of voter's lock script>
+        smt_proof: <SMT proof>
+```
+
+### Vote Consumption
+
+Release CKB asserts back to users
+
+```
+cell_deps:
+    <vec> CKB dao vote type script
+inputs:
+    <vec> cell
+        data: <any>
+        type: <CKB dao vote type script>
+            code_hash: <code hash of CKB dao vote type script>
+            hash_type: <hash type of CKB dao vote type script>
+            args: <blake160 hash of vote meta cell out point, 20 bytes>
+        lock: <lock script>
+outputs:
+    <vec> any cell
+
+witnesses:
+    <vec> WitnessArgs
+        lock: <signature to lock script>
+        input_type: <any>
+        output_type: <any>
+```
+
+Note, there is no need to attach vote meta cell in cell_deps.
+
+### Multiple Votes in Single Transaction
+
+```
+cell_deps:
+    <vec> CKB dao vote type script
+    <vec> vote meta cell
+        smt_root_hash: <SMT root hash>
+        candidates: <array of candidates>
+        start_time: <not validated by on-chain script>
+        end_time: <not validated by on-chain script>
+        extra: <not validated by on-chain script>
+inputs:
+    <vec> cell
+        data: <any>
+        type: <any>
+        lock: <voter A's lock script>
+    <vec> cell
+        data: <any>
+        type: <any>
+        lock: <voter B's lock script>
+outputs:
+    <vec> vote cell(voter A)
+        data: <candidate, 1 byte>
+        type: <CKB dao vote type script>
+            code_hash: <code hash of CKB dao vote type script>
+            hash_type: <hash type of CKB dao vote type script>
+            args: <blake160 hash of vote meta cell out point, 20 bytes>
+        lock: <any>
+
+    <vec> vote cell(voter B)
+        data: <candidate, 1 byte>
+        type: <CKB dao vote type script>
+            code_hash: <code hash of CKB dao vote type script>
+            hash_type: <hash type of CKB dao vote type script>
+            args: <blake160 hash of vote meta cell out point, 20 bytes>
+        lock: <any>
+witnesses:
+    <vec> WitnessArgs
+      lock: <any>
+      input_type: <any>
+      output_type: <VoteProof>
+        lock_script_hash: <hash of voter A's lock script>
+        smt_proof: <SMT proof for voter A>
+    <vec> WitnessArgs
+      lock: <any>
+      input_type: <any>
+      output_type: <VoteProof>
+        lock_script_hash: <hash of voter B's lock script>
+        smt_proof: <SMT proof for voter B>
+```
+
 
 ## Deployment
 

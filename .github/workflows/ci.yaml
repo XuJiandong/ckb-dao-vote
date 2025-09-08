@@ -1,0 +1,29 @@
+name: ckb-dao-vote
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    - name: Install rust target
+      run: rustup target add riscv64imac-unknown-none-elf
+    - name: Install rustfmt
+      run: rustup component add rustfmt
+    - name: Check formatting
+      run: cargo fmt -- --check
+    - name: Make on-chain script
+      run: make build
+    - name: Make on-chain script with log
+      run: make build CARGO_ARGS="--features enable_log"
+    - name: Cargo test
+      run: make test CARGO_ARGS="-- --nocapture"
