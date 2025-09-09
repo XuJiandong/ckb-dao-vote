@@ -108,11 +108,19 @@ pub(crate) fn entry() -> Result<(), Error> {
 
         // step 6
         let cell_data = load_cell_data(index, Source::GroupOutput)?;
-        if cell_data.len() != 1 {
+        if cell_data.len() != 4 {
             return Err(Error::WrongVoteCandidate);
         }
-        let candidate = cell_data[0] as usize;
-        if candidate >= vote_meta.candidates()?.len()? {
+        let choices = u32::from_le_bytes(cell_data.try_into().unwrap());
+        if choices == 0 {
+            return Err(Error::WrongVoteCandidate);
+        }
+        let candidates_size = vote_meta.candidates()?.len()?;
+        if candidates_size > 32 {
+            return Err(Error::WrongVoteCandidate);
+        }
+        let highest_bit = 32 - choices.leading_zeros() as usize;
+        if highest_bit > candidates_size {
             return Err(Error::WrongVoteCandidate);
         }
     }

@@ -69,7 +69,7 @@ fn test_open_vote() {
         .build()];
 
     // this is the voter choice
-    let outputs_data = vec![Bytes::from(vec![0])];
+    let outputs_data = vec![Bytes::from(vec![1, 0, 0, 0])];
 
     let vote_proof = VoteProof {
         lock_script_hash: always_success_script
@@ -160,6 +160,8 @@ pub(crate) enum TestScheme {
     VerifySmtFail,
     NoLockFound,
     WrongVoteCandidate,
+    WrongVoteCandidateExceedLimit,
+    MultipleCandidates,
 }
 
 pub(crate) struct Config {
@@ -255,10 +257,19 @@ pub(crate) fn entry(config: &Config) {
         // choice
         match config.test_scheme {
             TestScheme::WrongVoteCandidate => {
-                outputs_data.push(Bytes::from(vec![0xFF]).pack());
+                outputs_data.push(Bytes::from(vec![0, 0, 0, 1]).pack());
+            }
+            TestScheme::WrongVoteCandidateExceedLimit => {
+                let data: u32 = 1 << config.candidate_count;
+                outputs_data.push(Bytes::copy_from_slice(&data.to_le_bytes()).pack());
+            }
+            TestScheme::MultipleCandidates => {
+                // select all choices
+                let data: u32 = (1 << config.candidate_count) - 1;
+                outputs_data.push(Bytes::copy_from_slice(&data.to_le_bytes()).pack());
             }
             _ => {
-                outputs_data.push(Bytes::from(vec![0]).pack());
+                outputs_data.push(Bytes::from(vec![1, 0, 0, 0]).pack());
             }
         }
 
@@ -307,7 +318,7 @@ pub(crate) fn entry(config: &Config) {
 
     let result = context.verify_tx(&tx, 10_000_000);
     match config.test_scheme {
-        TestScheme::Normal => {
+        TestScheme::Normal | TestScheme::MultipleCandidates => {
             assert!(result.is_ok());
             println!("consume cycles: {}", result.unwrap());
         }
@@ -395,5 +406,23 @@ fn test_molecule_failed() {
         voter_count: 1,
         candidate_count: 5,
         test_scheme: TestScheme::Molecule,
+    });
+}
+
+#[test]
+fn test_multiple_candidates() {
+    entry(&Config {
+        voter_count: 1,
+        candidate_count: 5,
+        test_scheme: TestScheme::MultipleCandidates,
+    });
+}
+
+#[test]
+fn test_wrong_vote_candidate_exceed_limit() {
+    entry(&Config {
+        voter_count: 1,
+        candidate_count: 5,
+        test_scheme: TestScheme::WrongVoteCandidateExceedLimit,
     });
 }

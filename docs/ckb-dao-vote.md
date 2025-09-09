@@ -79,11 +79,45 @@ table VoteProof {
 
 ## Cell Data Format
 
-The cell data contains exactly one byte representing the voter's choice:
+Vote cells store voter choices in a compact 4-byte (32-bit) format that allows for multiple candidate selection through bit flags.
 
-- **Format**: Unsigned 8-bit integer (0-255)
-- **Range**: Must correspond to a valid candidate index in the vote meta cell's `candidates` array
-- **Validation**: The type script verifies that the choice index does not exceed the number of available candidates
+### Data Structure
+- **Size**: Exactly 4 bytes (32 bits)
+- **Format**: Little-endian bit array
+- **Range**: Bit indices 0-31 (corresponding to up to 32 candidates)
+
+### Bit Mapping
+Each bit position represents a candidate index from the `candidates` array in the vote meta cell:
+- **Bit set to `1`**: Vote cast for the candidate at that index
+- **Bit set to `0`**: No vote cast for the candidate at that index
+
+### Examples
+
+**Single Choice Vote:**
+```
+Data: [0x01, 0x00, 0x00, 0x00]
+Binary: 00000001 00000000 00000000 00000000
+Selected candidate: Index 0
+```
+
+**Multiple Choice Vote:**
+```
+Data: [0x05, 0x00, 0x00, 0x00]
+Binary: 00000101 00000000 00000000 00000000
+Selected candidates: Indices 0 and 2
+```
+
+**Complex Multiple Choice:**
+```
+Data: [0x01, 0x01, 0x00, 0x01]
+Binary: 00000001 00000001 00000000 00000001
+Selected candidates: Indices 0, 8, and 24
+```
+
+### Validation Rules
+- The cell data must be exactly 4 bytes in length
+- At least one bit must be set (empty votes are invalid)
+- If a bit is set for index `i`, then `i` must be less than the length of the `candidates` array in the vote meta cell
 
 
 ## Validation Procedure
@@ -108,7 +142,7 @@ Read the `smt_root_hash` from the vote meta cell. If the SMT root hash is presen
 Verify that at least one input cell contains a lock script whose hash matches the `lock_script_hash` specified in the witness. This ensures the voter controls the claimed identity.
 
 **Step 6: Vote Choice Validation**
-Read the first byte of the cell data and convert it to an unsigned integer `index`. Verify that this index is within the valid range (less than the length of the `candidates` array in the vote meta cell).
+Read all 4 bytes of the cell data as a 32-bit little-endian bit array. For each bit set to `1`, verify that the corresponding bit index is within the valid range (less than the length of the `candidates` array in the vote meta cell). Ensure at least one bit is set (non-empty vote).
 
 Steps 4, 5, and 6 are repeated for every cell in the same group of the type script. This allows multiple votes in one transaction.
 
@@ -132,7 +166,7 @@ inputs:
         lock: <voter's lock script>
 outputs:
     <vec> vote cell
-        data: <candidate, 1 byte>
+        data: <vote choices, 4 bytes>
         type: <CKB dao vote type script>
             code_hash: <code hash of CKB dao vote type script>
             hash_type: <hash type of CKB dao vote type script>
@@ -196,7 +230,7 @@ inputs:
         lock: <voter B's lock script>
 outputs:
     <vec> vote cell(voter A)
-        data: <candidate, 1 byte>
+        data: <vote choices, 4 bytes>
         type: <CKB dao vote type script>
             code_hash: <code hash of CKB dao vote type script>
             hash_type: <hash type of CKB dao vote type script>
@@ -204,7 +238,7 @@ outputs:
         lock: <any>
 
     <vec> vote cell(voter B)
-        data: <candidate, 1 byte>
+        data: <vote choices, 4 bytes>
         type: <CKB dao vote type script>
             code_hash: <code hash of CKB dao vote type script>
             hash_type: <hash type of CKB dao vote type script>
