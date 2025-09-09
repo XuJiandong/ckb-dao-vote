@@ -29,7 +29,7 @@ fn count_matching_type_scripts(
     target_hash_type: Byte,
 ) -> usize {
     QueryIter::new(load_cell_type, source)
-        .filter_map(|script_opt| script_opt)
+        .flatten()
         .filter(|script| {
             script.code_hash() == *target_code_hash && script.hash_type() == target_hash_type
         })
@@ -95,10 +95,7 @@ pub(crate) fn entry() -> Result<(), Error> {
             let compiled_proof = CompiledMerkleProof(proof);
             // step 4
             compiled_proof
-                .verify::<Blake2bHasher>(
-                    &root_hash.clone().into(),
-                    vec![(hash.clone().into(), SMT_VALUE.clone().into())],
-                )
+                .verify::<Blake2bHasher>(&root_hash.into(), vec![(hash.into(), SMT_VALUE.into())])
                 .map_err(|_| Error::VerifySmtFail)?;
         }
         // step 5
