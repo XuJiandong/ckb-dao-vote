@@ -29,7 +29,7 @@ fn count_matching_type_scripts(
     target_hash_type: Byte,
 ) -> usize {
     QueryIter::new(load_cell_type, source)
-        .filter_map(|script_opt| script_opt)
+        .flatten()
         .filter(|script| {
             script.code_hash() == *target_code_hash && script.hash_type() == target_hash_type
         })
@@ -95,10 +95,7 @@ pub(crate) fn entry() -> Result<(), Error> {
             let compiled_proof = CompiledMerkleProof(proof);
             // step 4
             compiled_proof
-                .verify::<Blake2bHasher>(
-                    &root_hash.clone().into(),
-                    vec![(hash.clone().into(), SMT_VALUE.clone().into())],
-                )
+                .verify::<Blake2bHasher>(&root_hash.into(), vec![(hash.into(), SMT_VALUE.into())])
                 .map_err(|_| Error::VerifySmtFail)?;
         }
         // step 5
@@ -108,11 +105,19 @@ pub(crate) fn entry() -> Result<(), Error> {
 
         // step 6
         let cell_data = load_cell_data(index, Source::GroupOutput)?;
-        if cell_data.len() != 1 {
+        if cell_data.len() != 4 {
             return Err(Error::WrongVoteCandidate);
         }
-        let candidate = cell_data[0] as usize;
-        if candidate >= vote_meta.candidates()?.len()? {
+        let choices = u32::from_le_bytes(cell_data.try_into().unwrap());
+        if choices == 0 {
+            return Err(Error::WrongVoteCandidate);
+        }
+        let candidates_size = vote_meta.candidates()?.len()?;
+        if candidates_size > 32 {
+            return Err(Error::WrongVoteCandidate);
+        }
+        let highest_bit = 32 - choices.leading_zeros() as usize;
+        if highest_bit > candidates_size {
             return Err(Error::WrongVoteCandidate);
         }
     }

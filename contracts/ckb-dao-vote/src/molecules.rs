@@ -89,12 +89,7 @@ impl TxReader {
 
 impl Read for TxReader {
     fn read(&self, buf: &mut [u8], offset: usize) -> Result<usize, MoleculeError> {
-        read_data(
-            |buf, offset| syscalls::load_transaction(buf, offset),
-            buf,
-            offset,
-            self.total_size,
-        )
+        read_data(syscalls::load_transaction, buf, offset, self.total_size)
     }
 }
 
