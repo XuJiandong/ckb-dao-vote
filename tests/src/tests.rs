@@ -158,6 +158,7 @@ pub(crate) enum TestScheme {
     WrongArgs,
     NoMetaCell,
     VerifySmtFail,
+    VerifySmtNotOn,
     NoLockFound,
     WrongVoteCandidate,
     WrongVoteCandidateExceedLimit,
@@ -187,9 +188,12 @@ pub(crate) fn entry(config: &Config) {
             .update(key.into(), SMT_VALUE.clone().into())
             .unwrap();
     }
-
+    let smt_root_hash = match config.test_scheme {
+        TestScheme::VerifySmtNotOn => [0u8; 32],
+        _ => smt_tree.root().clone().into(),
+    };
     let vote_meta = VoteMeta {
-        smt_root_hash: Some(smt_tree.root().clone().into()),
+        smt_root_hash: Some(smt_root_hash),
         candidates: (0..config.candidate_count).map(|i| vec![i as u8]).collect(),
         start_time: 0,
         end_time: 0,
@@ -397,6 +401,15 @@ fn test_verify_smt_fail() {
         voter_count: 1,
         candidate_count: 5,
         test_scheme: TestScheme::VerifySmtFail,
+    });
+}
+
+#[test]
+fn test_verify_smt_fail_not_on() {
+    entry(&Config {
+        voter_count: 1,
+        candidate_count: 5,
+        test_scheme: TestScheme::VerifySmtNotOn,
     });
 }
 

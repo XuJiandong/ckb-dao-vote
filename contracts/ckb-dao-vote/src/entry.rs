@@ -94,9 +94,14 @@ pub(crate) fn entry() -> Result<(), Error> {
             let proof: Vec<u8> = proof.try_into()?;
             let compiled_proof = CompiledMerkleProof(proof);
             // step 4
-            compiled_proof
+            let success = compiled_proof
                 .verify::<Blake2bHasher>(&root_hash.into(), vec![(hash.into(), SMT_VALUE.into())])
                 .map_err(|_| Error::VerifySmtFail)?;
+            if !success {
+                #[cfg(feature = "enable_log")]
+                log::info!("SMT verify failed. Not on tree.");
+                return Err(Error::VerifySmtFail);
+            }
         }
         // step 5
         if !QueryIter::new(load_cell_lock_hash, Source::Input).any(|lock| lock == hash) {
