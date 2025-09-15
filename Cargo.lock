@@ -1830,6 +1830,7 @@ dependencies = [
 [[package]]
 name = "sparse-merkle-tree"
 version = "0.6.2"
+source = "git+https://github.com/XuJiandong/sparse-merkle-tree.git?rev=8cdaba3#8cdaba3d8fbd2279cb9a69a5ada57a4cbfdde8c7"
 dependencies = [
  "blake2b-ref",
  "cc",

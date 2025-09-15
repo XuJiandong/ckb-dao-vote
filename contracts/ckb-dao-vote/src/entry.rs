@@ -1,7 +1,5 @@
 use crate::error::Error;
 use crate::molecules::{load_tx, load_vote_meta, load_vote_proof};
-use crate::smt_hasher::Blake2bHasher;
-use alloc::vec;
 use alloc::vec::Vec;
 use ckb_hash::new_blake2b;
 use ckb_std::ckb_constants::Source;
@@ -9,7 +7,7 @@ use ckb_std::ckb_types::packed::{Byte, Byte32};
 use ckb_std::high_level::{
     QueryIter, load_cell_data, load_cell_lock_hash, load_cell_type, load_script,
 };
-use sparse_merkle_tree::CompiledMerkleProof;
+use sparse_merkle_tree::SMTBuilder;
 
 const SMT_VALUE: [u8; 32] = [
     1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -92,12 +90,17 @@ pub(crate) fn entry() -> Result<(), Error> {
 
             let proof = vote_proof.smt_proof()?;
             let proof: Vec<u8> = proof.try_into()?;
-            let compiled_proof = CompiledMerkleProof(proof);
-            // step 4
-            let success = compiled_proof
-                .verify::<Blake2bHasher>(&root_hash.into(), vec![(hash.into(), SMT_VALUE.into())])
+            let smt_builder = SMTBuilder::new();
+            let smt_builder = smt_builder
+                .insert(&hash.into(), &SMT_VALUE.into())
                 .map_err(|_| Error::VerifySmtFail)?;
-            if !success {
+            let smt = smt_builder.build().map_err(|_| Error::VerifySmtFail)?;
+            // step 4
+            if smt
+                .verify(&root_hash.into(), &proof)
+                .map_err(|_| Error::VerifySmtFail)
+                .is_err()
+            {
                 #[cfg(feature = "enable_log")]
                 log::info!("SMT verify failed. Not on tree.");
                 return Err(Error::VerifySmtFail);
