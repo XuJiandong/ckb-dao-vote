@@ -288,7 +288,7 @@ dependencies = [
  "log",
  "molecule 0.9.1",
  "molecule-codegen",
- "sparse-merkle-tree 0.6.1 (git+https://github.com/nervosnetwork/sparse-merkle-tree.git?rev=9a893a2)",
+ "sparse-merkle-tree 0.6.2",
 ]
 
 [[package]]
@@ -1829,8 +1829,8 @@ dependencies = [
 
 [[package]]
 name = "sparse-merkle-tree"
-version = "0.6.1"
-source = "git+https://github.com/nervosnetwork/sparse-merkle-tree.git?rev=9a893a2#9a893a270de2466ffd3eff9ade57b0cb7da40881"
+version = "0.6.2"
+source = "git+https://github.com/nervosnetwork/sparse-merkle-tree.git?rev=350cfac#350cfacf44fb5f36722db3adbb310ddd924a2943"
 dependencies = [
  "blake2b-ref",
  "cc",
@@ -1898,7 +1898,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_molecule",
- "sparse-merkle-tree 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sparse-merkle-tree 0.6.1",
 ]
 
 [[package]]
