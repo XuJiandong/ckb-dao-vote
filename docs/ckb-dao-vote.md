@@ -278,9 +278,9 @@ An implementation of the type script spec above has been deployed to CKB mainnet
 
 | parameter   | value                                                                |
 | ----------- | -------------------------------------------------------------------- |
-| `code_hash` |  TODO |
+| `code_hash` |  0xb140de2d7d1536cfdcb82da7520475edce5785dff90edae9073c1143d88f50c5 |
 | `hash_type` | `type`                                                               |
-| `tx_hash`   | TODO   |
+| `tx_hash`   | 0x024ec56c1d2ad4940a96edfd5cfd736bdb0c7d7342da9e74d3033872bdb9cbc1   |
 | `index`     | `0x0`                                                                |
 | `dep_type`  | `code`                                                               |
 
